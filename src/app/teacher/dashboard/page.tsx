@@ -6,18 +6,48 @@ import toast from "react-hot-toast";
 import CreateClassModal from "@/components/CreateClassModal";
 import TeacherSidebar from "@/components/TeacherSidebar";
 
+type User = {
+  id: string;
+  name: string;
+};
+
+type ClassItem = {
+  scheduleId: string;
+  subject: string;
+  class: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+};
+
+type AttendanceStudent = {
+  rollNumber: string | number;
+  name: string;
+  status: string;
+};
+
+type AttendanceItem = {
+  id?: string;
+  subject: string;
+  class: string;
+  attendance: AttendanceStudent[];
+};
+
 export default function TeacherDashboard() {
-  const [user, setUser] = useState<any>(null);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [attendance, setAttendance] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceItem[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 FETCH DATA
   useEffect(() => {
-    const u = JSON.parse(localStorage.getItem("user") || "{}");
+    const stored = localStorage.getItem("user");
+    const u: User = stored ? JSON.parse(stored) : {};
 
-    if (!u?.id) return;
+    if (!u?.id) {
+      setLoading(false);
+      return;
+    }
 
     setUser(u);
 
@@ -33,12 +63,10 @@ export default function TeacherDashboard() {
         const classData = await classRes.json();
         const attendanceData = await attendanceRes.json();
 
-        console.log("CLASSES API:", classData);
-
         setClasses(classData.data || []);
         setAttendance(attendanceData.data || []);
-      } catch (err) {
-        console.log(err);
+      } catch (error) {
+        console.error(error);
         toast.error("Failed to load dashboard");
       } finally {
         setLoading(false);
@@ -48,53 +76,55 @@ export default function TeacherDashboard() {
     fetchData();
 
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/attendance/teacher?teacherId=${u.id}`);
-
-      const data = await res.json();
-
-      setAttendance(data.data || []);
+      try {
+        const res = await fetch(`/api/attendance/teacher?teacherId=${u.id}`);
+        const data = await res.json();
+        setAttendance(data.data || []);
+      } catch (error) {
+        console.error(error);
+      }
     }, 5000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // 🔥 DELETE CLASS
   const handleDelete = async (id: string) => {
-  const ok = confirm("Delete this class?");
-  if (!ok) return;
+    const ok = confirm("Delete this class?");
+    if (!ok) return;
 
-  try {
-    const res = await fetch("/api/schedule/delete", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ scheduleId: id }),
-    });
+    try {
+      const res = await fetch("/api/schedule/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ scheduleId: id }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.message) {
-      toast.success("Class deleted");
+      if (data.message) {
+        toast.success("Class deleted");
 
-      setClasses((prev: any) =>
-        prev.filter((c: any) => c.scheduleId !== id)
-      );
-    } else {
-      toast.error(data.error || "Delete failed");
+        setClasses((prev) => prev.filter((item) => item.scheduleId !== id));
+      } else {
+        toast.error(data.error || "Delete failed");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Delete failed");
     }
-  } catch (err) {
-    toast.error("Delete failed");
-    console.log(err);
-  }
-};
+  };
 
-  // 🔥 HELPERS
   const sendEmail = () => toast("Email feature coming soon");
-  const viewAttendance = () => toast("Detailed view coming soon");
+
+  const viewAttendance = (_item: AttendanceItem) => {
+    toast("Detailed view coming soon");
+  };
 
   const formatTime = (time: string) => {
     const date = new Date(time);
+
     return date.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
@@ -110,14 +140,11 @@ export default function TeacherDashboard() {
       <TeacherSidebar />
 
       <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
-        {/* HEADER */}
         <h1 className="text-2xl font-semibold mb-6">
           Welcome, {user?.name || "Teacher"} 👋
         </h1>
 
-        {/* CLASS CARDS */}
         <div className="grid grid-cols-4 gap-5 mb-8">
-          {/* CREATE CARD */}
           <div
             onClick={() => setOpen(true)}
             className="bg-white p-5 rounded-2xl shadow cursor-pointer hover:shadow-lg transition flex items-center gap-3"
@@ -126,10 +153,9 @@ export default function TeacherDashboard() {
             <span className="font-medium">Create Class</span>
           </div>
 
-          {/* CLASS LIST */}
-          {classes.map((cls: any, i) => (
+          {classes.map((cls) => (
             <div
-              key={i}
+              key={cls.scheduleId}
               className="bg-white p-5 rounded-2xl shadow hover:shadow-lg transition relative border"
             >
               <div className="flex justify-between">
@@ -155,7 +181,6 @@ export default function TeacherDashboard() {
           ))}
         </div>
 
-        {/* QUICK ACTIONS */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
 
@@ -183,10 +208,10 @@ export default function TeacherDashboard() {
           </div>
         </div>
 
-        {/* UPCOMING */}
         <div className="bg-white p-6 rounded-2xl shadow mb-8">
           <div className="flex justify-between mb-4">
             <h3 className="font-semibold">Upcoming Sessions</h3>
+
             <button
               onClick={() => toast("Full schedule page next")}
               className="text-blue-600 text-sm cursor-pointer"
@@ -199,9 +224,9 @@ export default function TeacherDashboard() {
             <p className="text-gray-500">No upcoming sessions</p>
           ) : (
             <div className="grid grid-cols-3 gap-4">
-              {classes.slice(0, 3).map((cls: any, i) => (
+              {classes.slice(0, 3).map((cls) => (
                 <div
-                  key={i}
+                  key={cls.scheduleId}
                   className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border"
                 >
                   <p className="font-medium">{cls.subject}</p>
@@ -209,6 +234,7 @@ export default function TeacherDashboard() {
 
                   <div className="flex justify-between mt-3 text-xs text-gray-600">
                     <span>{cls.dayOfWeek}</span>
+
                     <span>
                       {formatTime(cls.startTime)} - {formatTime(cls.endTime)}
                     </span>
@@ -219,10 +245,10 @@ export default function TeacherDashboard() {
           )}
         </div>
 
-        {/* ATTENDANCE */}
         <div className="bg-white p-6 rounded-2xl shadow">
           <div className="flex justify-between mb-4">
             <h3 className="font-semibold">Recent Attendance</h3>
+
             <button
               onClick={() => toast("Full attendance page next")}
               className="text-blue-600 text-sm cursor-pointer"
@@ -235,9 +261,9 @@ export default function TeacherDashboard() {
             <p className="text-gray-500">No attendance recorded yet.</p>
           ) : (
             <div className="space-y-4">
-              {attendance.slice(0, 3).map((cls: any, i) => (
+              {attendance.slice(0, 3).map((cls, index) => (
                 <div
-                  key={i}
+                  key={cls.id || index}
                   className="bg-white border rounded-xl p-4 hover:shadow-md transition"
                 >
                   <div className="flex justify-between items-center mb-2">
@@ -271,8 +297,9 @@ export default function TeacherDashboard() {
 
                   <p className="text-sm text-gray-500">
                     {
-                      cls.attendance.filter((s: any) => s.status === "Present")
-                        .length
+                      cls.attendance.filter(
+                        (student) => student.status === "Present"
+                      ).length
                     }{" "}
                     present
                   </p>
@@ -282,12 +309,10 @@ export default function TeacherDashboard() {
           )}
         </div>
 
-        {/* MODAL */}
         <CreateClassModal
           open={open}
           setOpen={setOpen}
           onSuccess={() => {
-            // 🔥 REFETCH instead of fake update
             window.location.reload();
           }}
         />
@@ -296,14 +321,17 @@ export default function TeacherDashboard() {
   );
 }
 
-// 🔥 CSV DOWNLOAD
-function downloadCSV(attendance: any[]) {
+function downloadCSV(attendance: AttendanceStudent[]) {
   const rows = [
     ["Roll", "Name", "Status"],
-    ...attendance.map((s) => [s.rollNumber, s.name, s.status]),
+    ...attendance.map((student) => [
+      student.rollNumber,
+      student.name,
+      student.status,
+    ]),
   ];
 
-  const csv = rows.map((r) => r.join(",")).join("\n");
+  const csv = rows.map((row) => row.join(",")).join("\n");
 
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);

@@ -80,6 +80,8 @@ model Schedule {
 
   attendance Attendance[]
 
+  sessions   AttendanceSession[]
+
 }
 
 model Attendance {
@@ -96,4 +98,14 @@ model Attendance {
   @@unique([studentId, scheduleId, date])
 }
 
+model AttendanceSession {
+  id         String   @id @default(uuid())
+  scheduleId String
 
+  isActive   Boolean  @default(true)
+
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+}
