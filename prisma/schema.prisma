@@ -8,16 +8,15 @@ datasource db {
 }
 
 model Teacher {
-  id        String @id @default(uuid())
+  id        String   @id @default(uuid())
   name      String
-  teacherId String @unique
-  email     String @unique
+  teacherId String   @unique
+  email     String   @unique
   phone     String
   password  String
+  createdAt DateTime @default(now())
 
   schedules Schedule[]
-
-  createdAt DateTime @default(now())
 }
 
 model Student {
@@ -27,22 +26,26 @@ model Student {
   email      String   @unique
   phone      String
   password   String
+  createdAt  DateTime @default(now())
 
-  classId    String
-  class      Class    @relation(fields: [classId], references: [id])
+  classId String
+  class   Class  @relation(fields: [classId], references: [id])
 
   device     Device?
   attendance Attendance[]
-  createdAt  DateTime @default(now())
+
+  @@unique([classId, rollNumber])
 }
 
+/// A student's registered phone. The ESP32 reports MAC addresses it sees;
+/// a match here identifies the student. Stored normalized as AA:BB:CC:DD:EE:FF.
 model Device {
   id         String  @id @default(uuid())
   macAddress String  @unique
   deviceName String?
 
-  studentId String  @unique // 🔥 one-to-one fix
-  student   Student @relation(fields: [studentId], references: [id])
+  studentId String  @unique
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model Class {
@@ -52,6 +55,8 @@ model Class {
 
   students  Student[]
   schedules Schedule[]
+
+  @@unique([className, section])
 }
 
 model Subject {
@@ -62,50 +67,60 @@ model Subject {
   schedules Schedule[]
 }
 
+/// A weekly recurring lecture slot. Times are wall-clock "HH:mm" strings in
+/// APP_TIMEZONE, so they compare lexicographically and survive server TZ changes.
 model Schedule {
-  id String @id @default(uuid())
+  id        String   @id @default(uuid())
+  dayOfWeek String // MONDAY..SUNDAY
+  startTime String // "HH:mm"
+  endTime   String // "HH:mm"
+  createdAt DateTime @default(now())
 
   teacherId String
   classId   String
   subjectId String
 
-  dayOfWeek String
-
-  startTime DateTime
-  endTime   DateTime
-
-  teacher Teacher @relation(fields: [teacherId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   class   Class   @relation(fields: [classId], references: [id])
   subject Subject @relation(fields: [subjectId], references: [id])
 
   attendance Attendance[]
-
   sessions   AttendanceSession[]
 
+  @@index([classId, dayOfWeek])
+  @@index([teacherId])
 }
 
+/// One row per student per lecture occurrence. Missing rows for a finished
+/// occurrence are reported as Absent, so absences never need a background job.
 model Attendance {
-  id         String   @id @default(uuid())
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date // calendar date of the lecture in APP_TIMEZONE
+  status    String // "Present" | "Absent"
+  source    String   @default("WIFI") // "WIFI" | "MANUAL"
+  timestamp DateTime @default(now())
+
   studentId  String
   scheduleId String
-  date       DateTime
-  status     String
-  timestamp  DateTime @default(now())
 
-  student Student @relation(fields: [studentId], references: [id])
-  schedule Schedule @relation(fields: [scheduleId], references: [id])
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schedule Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, scheduleId, date])
+  @@index([scheduleId, date])
 }
 
+/// A teacher-started attendance window. While active, the ESP32's scans count
+/// for this schedule even outside its regular time slot (extra/rescheduled class).
 model AttendanceSession {
-  id         String   @id @default(uuid())
+  id        String    @id @default(uuid())
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  endedAt   DateTime?
+
   scheduleId String
-
-  isActive   Boolean  @default(true)
-
-  createdAt  DateTime @default(now())
-  expiresAt  DateTime
-
   schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, expiresAt])
 }

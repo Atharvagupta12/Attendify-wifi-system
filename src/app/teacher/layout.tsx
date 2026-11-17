@@ -1,45 +1,13 @@
-"use client"
+import type { ReactNode } from "react"
+import { redirect } from "next/navigation"
+import AppShell from "@/components/app-shell"
+import { getCurrentUser } from "@/lib/user"
 
-import { ReactNode, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Navbar from "@/components/navbar"
+// Server-side guard: the JWT cookie is verified before any teacher page renders.
+export default async function TeacherLayout({ children }: { children: ReactNode }) {
+  const user = await getCurrentUser()
+  if (!user) redirect("/login")
+  if (user.role !== "teacher") redirect("/student/dashboard")
 
-export default function TeacherLayout({ children }: { children: ReactNode }) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const user = localStorage.getItem("user")
-
-    if (!user) {
-      router.push("/login")
-    } else {
-      const parsed = JSON.parse(user)
-
-      if (parsed.role !== "teacher") {
-        router.push("/login")
-      } else {
-        setLoading(false)
-      }
-    }
-  }, [])
-
-  if (loading) {
-    return <div className="p-6">Checking authentication...</div>
-  }
-
-  return (
-    <div className="h-screen flex flex-col">
-
-      <Navbar />
-
-      <div className="flex flex-1">
-
-        <main className="flex-1  bg-slate-50 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-
-    </div>
-  )
+  return <AppShell user={user}>{children}</AppShell>
 }

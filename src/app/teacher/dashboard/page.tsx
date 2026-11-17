@@ -1,343 +1,274 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { Plus, PlayCircle, Users } from "lucide-react";
-import toast from "react-hot-toast";
-import CreateClassModal from "@/components/CreateClassModal";
-import TeacherSidebar from "@/components/TeacherSidebar";
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import toast from "react-hot-toast"
+import {
+  BookOpen,
+  CalendarPlus,
+  ChevronRight,
+  ClipboardCheck,
+  PlayCircle,
+  Radio,
+  Square,
+  TrendingUp,
+  Users,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { EmptyState, PageHeader, Panel, Spinner, StatCard, StatusBadge, selectClass } from "@/components/common"
+import { useUser } from "@/components/app-shell"
+import { api, errorMessage } from "@/lib/client"
+import { useResource } from "@/lib/use-resource"
+import { formatDateLabel, formatTimeRange } from "@/lib/format"
 
-type User = {
-  id: string;
-  name: string;
-};
-
-type ClassItem = {
-  scheduleId: string;
-  subject: string;
-  class: string;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-};
-
-type AttendanceStudent = {
-  rollNumber: string | number;
-  name: string;
-  status: string;
-};
-
-type AttendanceItem = {
-  id?: string;
-  subject: string;
-  class: string;
-  attendance: AttendanceStudent[];
-};
-
-export default function TeacherDashboard() {
-  const [user, setUser] = useState<User | null>(null);
-  const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceItem[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("user");
-    const u: User = stored ? JSON.parse(stored) : {};
-
-    if (!u?.id) {
-      setLoading(false);
-      return;
-    }
-
-    setUser(u);
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-
-        const [classRes, attendanceRes] = await Promise.all([
-          fetch(`/api/schedule/teacher?teacherId=${u.id}`),
-          fetch(`/api/attendance/teacher?teacherId=${u.id}`),
-        ]);
-
-        const classData = await classRes.json();
-        const attendanceData = await attendanceRes.json();
-
-        setClasses(classData.data || []);
-        setAttendance(attendanceData.data || []);
-      } catch (error) {
-        console.error(error);
-        toast.error("Failed to load dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/attendance/teacher?teacherId=${u.id}`);
-        const data = await res.json();
-        setAttendance(data.data || []);
-      } catch (error) {
-        console.error(error);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleDelete = async (id: string) => {
-    const ok = confirm("Delete this class?");
-    if (!ok) return;
-
-    try {
-      const res = await fetch("/api/schedule/delete", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ scheduleId: id }),
-      });
-
-      const data = await res.json();
-
-      if (data.message) {
-        toast.success("Class deleted");
-
-        setClasses((prev) => prev.filter((item) => item.scheduleId !== id));
-      } else {
-        toast.error(data.error || "Delete failed");
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Delete failed");
-    }
-  };
-
-  const sendEmail = () => toast("Email feature coming soon");
-
-  const viewAttendance = (_item: AttendanceItem) => {
-    toast("Detailed view coming soon");
-  };
-
-  const formatTime = (time: string) => {
-    const date = new Date(time);
-
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  if (loading) {
-    return <div className="p-10 text-center">Loading dashboard...</div>;
+type Overview = {
+  today: string
+  todaysClasses: {
+    scheduleId: string
+    subject: string
+    class: string
+    startTime: string
+    endTime: string
+    state: "upcoming" | "live" | "completed"
+    present: number
+    total: number
+  }[]
+  activeSession: { id: string; scheduleId: string; subject: string; class: string; expiresAt: string } | null
+  stats: {
+    weeklyClasses: number
+    classes: number
+    students: number
+    lecturesHeld30d: number
+    averageAttendance: number | null
   }
-
-  return (
-    <div className="flex h-screen">
-      <TeacherSidebar />
-
-      <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
-        <h1 className="text-2xl font-semibold mb-6">
-          Welcome, {user?.name || "Teacher"} 👋
-        </h1>
-
-        <div className="grid grid-cols-4 gap-5 mb-8">
-          <div
-            onClick={() => setOpen(true)}
-            className="bg-white p-5 rounded-2xl shadow cursor-pointer hover:shadow-lg transition flex items-center gap-3"
-          >
-            <Plus />
-            <span className="font-medium">Create Class</span>
-          </div>
-
-          {classes.map((cls) => (
-            <div
-              key={cls.scheduleId}
-              className="bg-white p-5 rounded-2xl shadow hover:shadow-lg transition relative border"
-            >
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-semibold text-lg">{cls.subject}</p>
-                  <p className="text-sm text-gray-500">{cls.class}</p>
-
-                  <p className="text-xs mt-2 text-gray-600">{cls.dayOfWeek}</p>
-
-                  <p className="text-xs text-gray-600">
-                    {formatTime(cls.startTime)} - {formatTime(cls.endTime)}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => handleDelete(cls.scheduleId)}
-                  className="text-red-500 text-sm hover:text-red-700 cursor-pointer"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => setOpen(true)}
-              className="bg-blue-500 hover:bg-blue-600 transition text-white px-5 py-2 rounded-lg flex items-center gap-2 cursor-pointer"
-            >
-              <Plus size={16} /> Create Class
-            </button>
-
-            <button
-              onClick={() => toast("ESP32 attendance will trigger here")}
-              className="bg-green-600 hover:bg-green-700 transition text-white px-5 py-2 rounded-lg flex items-center gap-2 cursor-pointer"
-            >
-              <PlayCircle size={16} /> Start Attendance
-            </button>
-
-            <button
-              onClick={() => toast("Coming soon")}
-              className="bg-yellow-400 hover:bg-yellow-500 transition px-5 py-2 rounded-lg flex items-center gap-2 cursor-pointer"
-            >
-              <Users size={16} /> View Students
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow mb-8">
-          <div className="flex justify-between mb-4">
-            <h3 className="font-semibold">Upcoming Sessions</h3>
-
-            <button
-              onClick={() => toast("Full schedule page next")}
-              className="text-blue-600 text-sm cursor-pointer"
-            >
-              View All
-            </button>
-          </div>
-
-          {classes.length === 0 ? (
-            <p className="text-gray-500">No upcoming sessions</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-4">
-              {classes.slice(0, 3).map((cls) => (
-                <div
-                  key={cls.scheduleId}
-                  className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border"
-                >
-                  <p className="font-medium">{cls.subject}</p>
-                  <p className="text-sm text-gray-500">{cls.class}</p>
-
-                  <div className="flex justify-between mt-3 text-xs text-gray-600">
-                    <span>{cls.dayOfWeek}</span>
-
-                    <span>
-                      {formatTime(cls.startTime)} - {formatTime(cls.endTime)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow">
-          <div className="flex justify-between mb-4">
-            <h3 className="font-semibold">Recent Attendance</h3>
-
-            <button
-              onClick={() => toast("Full attendance page next")}
-              className="text-blue-600 text-sm cursor-pointer"
-            >
-              View All
-            </button>
-          </div>
-
-          {attendance.length === 0 ? (
-            <p className="text-gray-500">No attendance recorded yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {attendance.slice(0, 3).map((cls, index) => (
-                <div
-                  key={cls.id || index}
-                  className="bg-white border rounded-xl p-4 hover:shadow-md transition"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="font-medium">
-                      {cls.subject} • {cls.class}
-                    </p>
-
-                    <div className="flex gap-3 text-sm">
-                      <button
-                        onClick={() => viewAttendance(cls)}
-                        className="text-blue-600 cursor-pointer"
-                      >
-                        View
-                      </button>
-
-                      <button
-                        onClick={() => downloadCSV(cls.attendance)}
-                        className="text-green-600 cursor-pointer"
-                      >
-                        Download
-                      </button>
-
-                      <button
-                        onClick={() => sendEmail()}
-                        className="text-purple-600 cursor-pointer"
-                      >
-                        Email
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-gray-500">
-                    {
-                      cls.attendance.filter(
-                        (student) => student.status === "Present"
-                      ).length
-                    }{" "}
-                    present
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <CreateClassModal
-          open={open}
-          setOpen={setOpen}
-          onSuccess={() => {
-            window.location.reload();
-          }}
-        />
-      </div>
-    </div>
-  );
+  recent: {
+    scheduleId: string
+    date: string
+    subject: string
+    class: string
+    startTime: string
+    endTime: string
+    present: number
+    total: number
+    state: string
+  }[]
 }
 
-function downloadCSV(attendance: AttendanceStudent[]) {
-  const rows = [
-    ["Roll", "Name", "Status"],
-    ...attendance.map((student) => [
-      student.rollNumber,
-      student.name,
-      student.status,
-    ]),
-  ];
+function useCountdown(target: string | undefined) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!target) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [target])
+  if (!target) return null
+  const ms = Math.max(0, new Date(target).getTime() - now)
+  const m = Math.floor(ms / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  return `${m}:${String(s).padStart(2, "0")}`
+}
 
-  const csv = rows.map((row) => row.join(",")).join("\n");
+export default function TeacherDashboard() {
+  const user = useUser()
+  // Live view: refresh every 10 s so WiFi check-ins appear without reloading.
+  const { data, reload: load } = useResource<Overview>("/api/teacher/overview", 10_000)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [duration, setDuration] = useState(60)
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
+  const countdown = useCountdown(data?.activeSession?.expiresAt)
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "attendance.csv";
-  a.click();
+  const startSession = async (scheduleId: string) => {
+    setBusy(scheduleId)
+    try {
+      await api("/api/teacher/sessions", { method: "POST", body: { scheduleId, durationMinutes: duration } })
+      toast.success(`Attendance open for ${duration} minutes`)
+      await load()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const stopSession = async (id: string) => {
+    setBusy(id)
+    try {
+      await api(`/api/teacher/sessions/${id}`, { method: "DELETE" })
+      toast.success("Attendance session closed")
+      await load()
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (!data) return <Spinner label="Loading dashboard…" />
+
+  const { stats, activeSession } = data
+  const firstName = user.name.split(" ")[0]
+
+  return (
+    <>
+      <PageHeader
+        title={`Hello, ${firstName}`}
+        description={`${formatDateLabel(data.today)} · ${data.todaysClasses.length} lecture${data.todaysClasses.length === 1 ? "" : "s"} today`}
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/teacher/schedule">
+              <CalendarPlus /> Manage schedule
+            </Link>
+          </Button>
+        }
+      />
+
+      {activeSession && (
+        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="relative flex size-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+              <Radio className="size-5" />
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
+            </span>
+            <div>
+              <p className="font-semibold">
+                Attendance session live · {activeSession.subject} ({activeSession.class})
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Students connected to the classroom WiFi are being marked present. Closes in{" "}
+                <span className="font-mono font-medium text-foreground">{countdown}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href={`/teacher/attendance?scheduleId=${activeSession.scheduleId}&date=${data.today}`}>
+                View roster
+              </Link>
+            </Button>
+            <Button variant="destructive" disabled={busy === activeSession.id} onClick={() => stopSession(activeSession.id)}>
+              <Square /> Stop
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={BookOpen} tone="primary" label="Weekly lectures" value={stats.weeklyClasses} hint={`${stats.classes} classes`} />
+        <StatCard icon={Users} label="Students" value={stats.students} hint="across your classes" />
+        <StatCard icon={ClipboardCheck} label="Lectures held" value={stats.lecturesHeld30d} hint="last 30 days" />
+        <StatCard
+          icon={TrendingUp}
+          tone={stats.averageAttendance === null ? "default" : stats.averageAttendance >= 75 ? "success" : "danger"}
+          label="Avg. attendance"
+          value={stats.averageAttendance === null ? "—" : `${stats.averageAttendance}%`}
+          hint="last 30 days"
+        />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Panel
+          className="lg:col-span-3"
+          title="Today's lectures"
+          action={
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Session length
+              <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className={`${selectClass} h-7 w-auto`}>
+                {[15, 30, 45, 60, 90].map((m) => (
+                  <option key={m} value={m}>
+                    {m} min
+                  </option>
+                ))}
+              </select>
+            </label>
+          }
+        >
+          {data.todaysClasses.length === 0 ? (
+            <EmptyState
+              icon={CalendarPlus}
+              title="No lectures today"
+              description="Enjoy the break — or add a lecture to your weekly schedule."
+              action={
+                <Button asChild size="sm">
+                  <Link href="/teacher/schedule">Add lecture</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="divide-y">
+              {data.todaysClasses.map((c) => {
+                const isSessionClass = activeSession?.scheduleId === c.scheduleId
+                return (
+                  <li key={c.scheduleId} className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{c.subject}</p>
+                        <StatusBadge status={c.state} />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {c.class} · {formatTimeRange(c.startTime, c.endTime)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        <span className="font-semibold text-foreground">{c.present}</span>/{c.total} present
+                      </span>
+                      {!isSessionClass && (
+                        <Button size="sm" variant="outline" disabled={busy === c.scheduleId} onClick={() => startSession(c.scheduleId)}>
+                          <PlayCircle /> Start session
+                        </Button>
+                      )}
+                      <Button asChild size="icon-sm" variant="ghost" aria-label="Open roster">
+                        <Link href={`/teacher/attendance?scheduleId=${c.scheduleId}&date=${data.today}`}>
+                          <ChevronRight />
+                        </Link>
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <p className="mt-4 text-xs text-muted-foreground">
+            Attendance opens automatically during each scheduled slot. Start a session to open it now — for extra or
+            rescheduled lectures.
+          </p>
+        </Panel>
+
+        <Panel
+          className="lg:col-span-2"
+          title="Recent lectures"
+          action={
+            <Link href="/teacher/attendance" className="text-sm font-medium text-primary hover:underline">
+              View all
+            </Link>
+          }
+        >
+          {data.recent.length === 0 ? (
+            <EmptyState icon={ClipboardCheck} title="No lectures yet" description="Attendance reports appear here once lectures are held." />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {data.recent.map((r) => (
+                <li key={`${r.scheduleId}-${r.date}`}>
+                  <Link
+                    href={`/teacher/attendance?scheduleId=${r.scheduleId}&date=${r.date}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {r.subject} · {r.class}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDateLabel(r.date, data.today)}</p>
+                    </div>
+                    <span className="shrink-0 text-sm tabular-nums">
+                      {r.present}/{r.total}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
+    </>
+  )
 }

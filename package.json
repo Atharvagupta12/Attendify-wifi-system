@@ -7,11 +7,14 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "postinstall": "prisma generate",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node --env-file=.env prisma/seed.mjs",
+    "simulate": "node --env-file=.env scripts/simulate-esp32.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "@shadcn/ui": "^0.0.4",
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

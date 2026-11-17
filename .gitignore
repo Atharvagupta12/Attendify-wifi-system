@@ -41,3 +41,9 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# env template is safe to commit
+!.env.example
+
+# ESP32 secrets
+/firmware/**/config.h

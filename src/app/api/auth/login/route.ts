@@ -1,84 +1,34 @@
 import { NextResponse } from "next/server"
 import bcrypt from "bcrypt"
-import jwt from "jsonwebtoken"
 import { prisma } from "@/lib/prisma"
+import { setAuthCookie, signToken } from "@/lib/auth"
+import { jsonError, parseBody, serverError } from "@/lib/api"
+import { loginSchema } from "@/lib/validators"
+
+// Compared against when the email doesn't exist, so response time doesn't reveal which emails are registered.
+const DUMMY_HASH = bcrypt.hashSync("attendify-dummy-password", 10)
 
 export async function POST(req: Request) {
+  const parsed = await parseBody(req, loginSchema)
+  if (!parsed.ok) return parsed.response
+  const { email, password, role } = parsed.data
+
   try {
-    const body = await req.json()
+    const user =
+      role === "teacher"
+        ? await prisma.teacher.findUnique({ where: { email } })
+        : await prisma.student.findUnique({ where: { email } })
 
-    const { email, password, role } = body
+    const valid = await bcrypt.compare(password, user?.password ?? DUMMY_HASH)
+    if (!user || !valid) return jsonError("Invalid email or password", 401)
 
-    if (!email || !password || !role) {
-      return NextResponse.json(
-        { error: "All fields required" },
-        { status: 400 }
-      )
-    }
-
-    let user: any
-
-    if (role === "teacher") {
-      user = await prisma.teacher.findUnique({
-        where: { email }
-      })
-    } else if (role === "student") {
-      user = await prisma.student.findUnique({
-        where: { email }
-      })
-    } else {
-      return NextResponse.json(
-        { error: "Invalid role" },
-        { status: 400 }
-      )
-    }
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      )
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password)
-
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      )
-    }
-
-    const token = jwt.sign(
-      {
-        id: user.id,
-        role
-      },
-      process.env.JWT_SECRET!,
-      { expiresIn: "7d" }
-    )
-
-    return NextResponse.json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        rollNumber: user.rollNumber,
-        className: user.className,
-        section: user.section,
-        role
-      }
+    const res = NextResponse.json({
+      user: { id: user.id, name: user.name, email: user.email, role },
+      redirectTo: role === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
     })
-
+    setAuthCookie(res, signToken({ id: user.id, role }))
+    return res
   } catch (error) {
-
-    console.log(error)
-
-    return NextResponse.json(
-      { error: "Server error" },
-      { status: 500 }
-    )
+    return serverError("auth/login", error)
   }
 }
