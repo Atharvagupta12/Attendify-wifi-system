@@ -7,6 +7,8 @@ import {
   Cpu,
   FileSpreadsheet,
   Fingerprint,
+  GraduationCap,
+  Presentation,
   Radio,
   ShieldCheck,
   Smartphone,
@@ -19,6 +21,7 @@ import { ThemeToggle } from "@/components/theme"
 import { DashboardPreview } from "@/components/dashboard-preview"
 import { RadarPulse, LiveDot } from "@/components/radar"
 import { getCurrentUser } from "@/lib/user"
+import { isDemoAvailable } from "@/lib/demo"
 
 const STATS = [
   ["0", "roll calls per lecture"],
@@ -67,7 +70,7 @@ const ROLES = [
 ]
 
 export default async function Home() {
-  const user = await getCurrentUser()
+  const [user, showDemo] = await Promise.all([getCurrentUser(), isDemoAvailable()])
   const dashboard = user ? `/${user.role}/dashboard` : null
 
   return (
@@ -133,9 +136,15 @@ export default async function Home() {
 
           <div className="mt-9 flex animate-rise flex-wrap justify-center gap-3 [animation-delay:240ms]">
             <Button asChild size="lg">
-              <Link href={dashboard ?? "/login"}>
-                {dashboard ? "Open dashboard" : "Try the live demo"} <ArrowRight />
-              </Link>
+              {dashboard ? (
+                <Link href={dashboard}>
+                  Open dashboard <ArrowRight />
+                </Link>
+              ) : (
+                <a href={showDemo ? "/demo/teacher" : "/login"}>
+                  Try the live demo <ArrowRight />
+                </a>
+              )}
             </Button>
             <Button asChild size="lg" variant="outline">
               <a href={GITHUB_URL} target="_blank" rel="noreferrer">
@@ -143,6 +152,8 @@ export default async function Home() {
               </a>
             </Button>
           </div>
+
+          {showDemo && <DemoPicker className="mt-8 animate-rise [animation-delay:300ms]" />}
         </div>
 
         {/* Product shot */}
@@ -311,11 +322,30 @@ export default async function Home() {
               Log in with a demo teacher or student account. No setup and no hardware needed.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Button asChild size="lg" className="bg-white text-[oklch(0.25_0.1_278)] shadow-none hover:bg-white/90">
-                <Link href={dashboard ?? "/login"}>
-                  {dashboard ? "Open dashboard" : "Try the demo"} <ArrowRight />
-                </Link>
-              </Button>
+              {showDemo ? (
+                <>
+                  {/* /demo/* is a route handler that sets the session cookie and redirects,
+                      so it needs a full-page navigation rather than client-side <Link> routing. */}
+                  <Button asChild size="lg" className="bg-white text-[oklch(0.25_0.1_278)] shadow-none hover:bg-white/90">
+                    {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+                    <a href="/demo/teacher">
+                      <Presentation /> Teacher demo
+                    </a>
+                  </Button>
+                  <Button asChild size="lg" className="border border-white/25 bg-white/10 text-white shadow-none hover:bg-white/20">
+                    {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+                    <a href="/demo/student">
+                      <GraduationCap /> Student demo
+                    </a>
+                  </Button>
+                </>
+              ) : (
+                <Button asChild size="lg" className="bg-white text-[oklch(0.25_0.1_278)] shadow-none hover:bg-white/90">
+                  <Link href={dashboard ?? "/login"}>
+                    {dashboard ? "Open dashboard" : "Log in"} <ArrowRight />
+                  </Link>
+                </Button>
+              )}
               <Button asChild size="lg" variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
                 <Link href="/register">Create an account</Link>
               </Button>
@@ -334,6 +364,39 @@ export default async function Home() {
           </a>
         </div>
       </footer>
+    </div>
+  )
+}
+
+/** "Explore as teacher / student" picker: one tap into a live demo dashboard. */
+function DemoPicker({ className }: { className?: string }) {
+  return (
+    <div className={`mx-auto w-full max-w-md ${className ?? ""}`}>
+      <p className="mb-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">No sign-up needed · explore as</p>
+      <div className="grid grid-cols-2 gap-3">
+        {(
+          [
+            ["teacher", "Teacher", "Live roster & sessions", Presentation],
+            ["student", "Student", "Attendance & calendar", GraduationCap],
+          ] as const
+        ).map(([role, title, sub, Icon]) => (
+          <a
+            key={role}
+            href={`/demo/${role}`}
+            className="group flex items-center gap-3 rounded-xl border bg-card/80 p-3 text-left shadow-soft backdrop-blur transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-float"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-110">
+              <Icon className="size-4" />
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-1 text-sm font-medium">
+                {title} <ArrowRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">{sub}</span>
+            </span>
+          </a>
+        ))}
+      </div>
     </div>
   )
 }

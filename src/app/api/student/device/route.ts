@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth"
 import { isUniqueViolation, jsonError, parseBody, serverError } from "@/lib/api"
 import { deviceSchema } from "@/lib/validators"
+import { isDemoUser } from "@/lib/demo"
 
 /** Register or replace the student's phone (e.g. new phone, or WiFi MAC randomisation changed it). */
 export async function PUT(req: Request) {
@@ -14,6 +15,9 @@ export async function PUT(req: Request) {
   const { macAddress, deviceName } = parsed.data
 
   try {
+    if (await isDemoUser(auth.session.id, "student")) {
+      return jsonError("The demo student's device can't be changed. Create your own account to try it.", 403)
+    }
     const taken = await prisma.device.findUnique({ where: { macAddress } })
     if (taken && taken.studentId !== auth.session.id) {
       return jsonError("This device is already registered to another student", 409)

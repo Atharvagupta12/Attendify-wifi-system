@@ -87,7 +87,7 @@ npm run db:seed             # optional: demo teacher/student + 3 weeks of histor
 npm run dev                 # http://localhost:3000
 ```
 
-The demo accounts (after seeding) are `teacher@demo.attendify.app` and `student@demo.attendify.app`, both with password `demo1234`. Set `NEXT_PUBLIC_SHOW_DEMO=true` to show one-click demo buttons on the login page.
+After seeding, anyone can open a demo dashboard in one tap: **`/demo/teacher`** or **`/demo/student`** (also linked from the landing, login and signup pages, on desktop and mobile). Demo accounts can't delete lectures or change their device, so the demo stays intact for the next visitor. You can also log in as `teacher@demo.attendify.app` or `student@demo.attendify.app` with password `demo1234`. Set `DEMO_MODE=false` to hide demo access.
 
 ### Try the WiFi flow without hardware
 

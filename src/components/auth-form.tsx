@@ -29,14 +29,7 @@ const EMPTY = {
   deviceName: "",
 }
 
-// Demo accounts created by `npm run db:seed`; shown only when NEXT_PUBLIC_SHOW_DEMO=true.
-const SHOW_DEMO = process.env.NEXT_PUBLIC_SHOW_DEMO === "true"
-const DEMO = {
-  teacher: { email: "teacher@demo.attendify.app", password: "demo1234" },
-  student: { email: "student@demo.attendify.app", password: "demo1234" },
-}
-
-export default function AuthForm({ mode }: { mode: Mode }) {
+export default function AuthForm({ mode, showDemo }: { mode: Mode; showDemo: boolean }) {
   const router = useRouter()
   const [role, setRole] = useState<Role>("teacher")
   const [form, setForm] = useState(EMPTY)
@@ -97,16 +90,6 @@ export default function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
-  const demoLogin = async (as: Role) => {
-    setLoading(as)
-    try {
-      await login(DEMO[as].email, DEMO[as].password, as)
-    } catch (err) {
-      toast.error(errorMessage(err))
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[1fr_1.1fr]">
       {/* ---------- Form side ---------- */}
@@ -127,9 +110,12 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             {isRegister ? "Set up takes less than a minute." : "Log in to see today's attendance."}
           </p>
 
-          {/* Demo accounts */}
-          {SHOW_DEMO && !isRegister && (
+          {/* Demo accounts: one tap, works on any device */}
+          {showDemo && (
             <div className="mt-8 animate-rise [animation-delay:120ms]">
+              <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Sparkles className="size-3.5 text-primary" /> Explore instantly, no sign-up needed
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 {(
                   [
@@ -137,12 +123,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                     ["student", "Demo student", "Attendance stats", GraduationCap],
                   ] as const
                 ).map(([as, title, sub, Icon]) => (
-                  <button
+                  <a
                     key={as}
-                    type="button"
-                    disabled={!!loading}
-                    onClick={() => demoLogin(as)}
-                    className="group relative flex flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-float disabled:opacity-60"
+                    href={`/demo/${as}`}
+                    aria-disabled={!!loading}
+                    onClick={() => setLoading(as)}
+                    className={cn(
+                      "group relative flex flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-float",
+                      loading && "pointer-events-none opacity-60",
+                    )}
                   >
                     <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                       {loading === as ? <Loader2 className="size-4 animate-spin" /> : <Icon className="size-4" />}
@@ -151,19 +140,20 @@ export default function AuthForm({ mode }: { mode: Mode }) {
                       <span className="block text-sm font-medium">{title}</span>
                       <span className="block text-xs text-muted-foreground">{sub}</span>
                     </span>
-                    <ArrowRight className="absolute top-4 right-4 size-4 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-                  </button>
+                    <ArrowRight className="absolute top-4 right-4 size-4 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary sm:opacity-0 sm:group-hover:opacity-100" />
+                  </a>
                 ))}
               </div>
               <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="h-px flex-1 bg-border" /> or log in with email <span className="h-px flex-1 bg-border" />
+                <span className="h-px flex-1 bg-border" /> {isRegister ? "or create your own account" : "or log in with email"}{" "}
+                <span className="h-px flex-1 bg-border" />
               </div>
             </div>
           )}
 
           {/* Role switch */}
           <div
-            className={cn("relative grid animate-rise grid-cols-2 rounded-xl bg-muted p-1 [animation-delay:160ms]", !(SHOW_DEMO && !isRegister) && "mt-8")}
+            className={cn("relative grid animate-rise grid-cols-2 rounded-xl bg-muted p-1 [animation-delay:160ms]", !showDemo && "mt-8")}
             role="tablist"
           >
             <span

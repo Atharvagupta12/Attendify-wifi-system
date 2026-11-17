@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { CalendarDays, ClipboardCheck, LayoutDashboard, LogOut, Menu, X } from "lucide-react"
+import { ArrowLeftRight, CalendarDays, ClipboardCheck, LayoutDashboard, LogOut, Menu, Sparkles, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CurrentUser } from "@/lib/user"
 import { Logo } from "@/components/brand"
@@ -33,9 +33,9 @@ export default function AppShell({ user, children }: { user: CurrentUser; childr
   const router = useRouter()
   const [open, setOpen] = useState(false)
 
-  const logout = async () => {
+  const logout = async (to = "/login") => {
     await fetch("/api/auth/logout", { method: "POST" })
-    router.replace("/login")
+    router.replace(to)
     router.refresh()
   }
 
@@ -87,7 +87,7 @@ export default function AppShell({ user, children }: { user: CurrentUser; childr
             </div>
           </div>
           <button
-            onClick={logout}
+            onClick={() => logout()}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-danger/30 hover:bg-danger/5 hover:text-danger"
           >
             <LogOut className="size-4" /> Log out
@@ -141,9 +141,45 @@ export default function AppShell({ user, children }: { user: CurrentUser; childr
             </p>
             <ThemeToggle />
           </div>
-          <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">{children}</div>
+          <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">
+            {user.isDemo && <DemoBanner role={user.role} onCreateAccount={() => logout("/register")} />}
+            {children}
+          </div>
         </main>
       </div>
     </UserContext.Provider>
+  )
+}
+
+/** Shown on the public demo accounts: explains the mode and lets visitors hop between views. */
+function DemoBanner({ role, onCreateAccount }: { role: "teacher" | "student"; onCreateAccount: () => void }) {
+  const other = role === "teacher" ? "student" : "teacher"
+  return (
+    <div className="relative mb-6 flex animate-rise flex-col gap-3 overflow-hidden rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center">
+      <div className="absolute inset-0 bg-[radial-gradient(50%_120%_at_0%_0%,color-mix(in_oklch,var(--primary)_12%,transparent),transparent)]" />
+      <div className="relative flex min-w-0 flex-1 items-start gap-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-gradient text-white">
+          <Sparkles className="size-4" />
+        </span>
+        <div className="min-w-0 text-sm">
+          <p className="font-medium">You&apos;re exploring the demo {role} account</p>
+          <p className="text-muted-foreground">Real data, live features. Try it as a {other} too.</p>
+        </div>
+      </div>
+      <div className="relative flex gap-2">
+        <a
+          href={`/demo/${other}`}
+          className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground shadow-soft transition-colors hover:bg-primary/90 sm:flex-none"
+        >
+          <ArrowLeftRight className="size-3.5" /> {other === "student" ? "Student view" : "Teacher view"}
+        </a>
+        <button
+          onClick={onCreateAccount}
+          className="inline-flex h-8 flex-1 items-center justify-center rounded-lg border bg-card px-3 text-sm font-medium transition-colors hover:bg-muted sm:flex-none"
+        >
+          Create account
+        </button>
+      </div>
+    </div>
   )
 }
