@@ -56,8 +56,8 @@ export default function CreateScheduleDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="create-schedule-title">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <form onSubmit={submit} className="relative w-full max-w-md rounded-xl border bg-card p-6 shadow-xl">
+      <div className="absolute inset-0 animate-in bg-black/50 backdrop-blur-sm fade-in" onClick={onClose} />
+      <form onSubmit={submit} className="relative w-full max-w-md animate-in rounded-2xl border bg-card p-6 shadow-float duration-200 fade-in zoom-in-95">
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h2 id="create-schedule-title" className="text-lg font-semibold">

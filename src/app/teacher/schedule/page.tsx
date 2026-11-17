@@ -4,7 +4,7 @@ import { useState } from "react"
 import toast from "react-hot-toast"
 import { CalendarDays, Clock, Plus, Trash2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { EmptyState, PageHeader, Panel, Spinner } from "@/components/common"
+import { EmptyState, PageHeader, Panel, Skeleton } from "@/components/common"
 import CreateScheduleDialog from "@/components/create-schedule-dialog"
 import { api, errorMessage } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
@@ -56,7 +56,7 @@ export default function SchedulePage() {
       />
 
       {items === null ? (
-        <Spinner />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-56 rounded-2xl" />)}</div>
       ) : items.length === 0 ? (
         <Panel>
           <EmptyState

@@ -4,11 +4,25 @@ import { Suspense, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import toast from "react-hot-toast"
-import { ArrowLeft, ClipboardCheck, Download, Mail, Search, Wifi, UserPen } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ClipboardCheck, Download, Mail, Search, Wifi, UserPen, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { EmptyState, PageHeader, Panel, ProgressBar, Spinner, StatusBadge, selectClass } from "@/components/common"
+import {
+  EmptyState,
+  PageHeader,
+  Panel,
+  ProgressBar,
+  Skeleton,
+  StatCard,
+  StatusBadge,
+  TableSkeleton,
+  selectClass,
+} from "@/components/common"
+import { Avatar } from "@/components/avatar"
+import { AnimatedNumber } from "@/components/animated-number"
+import { AttendanceRing } from "@/components/charts"
+import { LiveDot } from "@/components/radar"
 import { api, downloadCsv, errorMessage } from "@/lib/client"
 import { useResource } from "@/lib/use-resource"
 import { formatDateLabel, formatTime12, formatTimeRange, percentage } from "@/lib/format"
@@ -43,7 +57,7 @@ type Roster = {
 
 export default function AttendancePage() {
   return (
-    <Suspense fallback={<Spinner />}>
+    <Suspense fallback={<RosterSkeleton />}>
       <AttendanceContent />
     </Suspense>
   )
@@ -112,7 +126,7 @@ function LectureHistory() {
         </div>
 
         {lectures === null ? (
-          <Spinner />
+          <TableSkeleton />
         ) : visible.length === 0 ? (
           <EmptyState icon={ClipboardCheck} title="No lectures in this period" description="Lectures appear here once their time slot starts." />
         ) : (
@@ -207,7 +221,7 @@ function RosterView({ scheduleId, date }: { scheduleId: string; date: string }) 
     }
   }
 
-  if (!roster) return <Spinner />
+  if (!roster) return <RosterSkeleton />
 
   const { schedule, summary } = roster
   const q = query.trim().toLowerCase()
@@ -253,23 +267,37 @@ function RosterView({ scheduleId, date }: { scheduleId: string; date: string }) 
         }
       />
 
-      <div className="mb-6 grid grid-cols-3 gap-3">
-        {[
-          ["Present", summary.present, "text-emerald-600"],
-          [roster.state === "completed" ? "Absent" : "Not yet", summary.absent, "text-red-600"],
-          ["Attendance", `${percentage(summary.present, summary.total) ?? 0}%`, "text-primary"],
-        ].map(([label, value, color]) => (
-          <div key={label as string} className="rounded-xl border bg-card p-4">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className={`text-2xl font-semibold tabular-nums ${color}`}>{value}</p>
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+        <StatCard icon={CheckCircle2} tone="success" label="Present" value={<AnimatedNumber value={summary.present} />} hint={`of ${summary.total} students`} />
+        <StatCard
+          icon={roster.state === "completed" ? XCircle : Wifi}
+          tone={roster.state === "completed" ? "danger" : "warning"}
+          label={roster.state === "completed" ? "Absent" : "Not checked in yet"}
+          value={<AnimatedNumber value={summary.absent} />}
+          hint={roster.state === "live" ? "updates every 5 seconds" : undefined}
+        />
+        <div className="flex items-center gap-4 rounded-2xl border bg-card p-5 shadow-soft">
+          <AttendanceRing value={percentage(summary.present, summary.total)} size={76} stroke={8}>
+            <span className="text-sm font-semibold tabular">{percentage(summary.present, summary.total) ?? 0}%</span>
+          </AttendanceRing>
+          <div>
+            <p className="text-sm text-muted-foreground">Attendance</p>
+            <p className="text-xs text-muted-foreground">Marker shows 75%</p>
           </div>
-        ))}
+        </div>
       </div>
 
       <Panel>
-        <div className="relative mb-4 sm:w-72">
-          <Search className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or roll no." className="pl-8" />
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative sm:w-72">
+            <Search className="absolute top-3 left-3 size-4 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or roll no." className="pl-9" />
+          </div>
+          {roster.state === "live" && (
+            <span className="flex items-center gap-2 text-sm text-muted-foreground">
+              <LiveDot /> Live: check-ins appear automatically
+            </span>
+          )}
         </div>
 
         {roster.students.length === 0 ? (
@@ -289,7 +317,11 @@ function RosterView({ scheduleId, date }: { scheduleId: string; date: string }) 
               {students.map((s) => (
                 <TableRow key={s.studentId}>
                   <TableCell className="tabular-nums">{s.rollNumber}</TableCell>
-                  <TableCell className="font-medium">{s.name}</TableCell>
+                  <TableCell>
+                    <span className="flex items-center gap-3 font-medium">
+                      <Avatar name={s.name} size="sm" /> {s.name}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={s.status} />
                   </TableCell>
@@ -329,5 +361,25 @@ function RosterView({ scheduleId, date }: { scheduleId: string; date: string }) 
         )}
       </Panel>
     </>
+  )
+}
+
+function RosterSkeleton() {
+  return (
+    <div aria-busy="true">
+      <Skeleton className="mb-6 h-4 w-28" />
+      <div className="mb-8 space-y-2">
+        <Skeleton className="h-8 w-72" />
+        <Skeleton className="h-4 w-56" />
+      </div>
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-[118px] rounded-2xl" />
+        ))}
+      </div>
+      <div className="rounded-2xl border bg-card p-5">
+        <TableSkeleton rows={8} />
+      </div>
+    </div>
   )
 }

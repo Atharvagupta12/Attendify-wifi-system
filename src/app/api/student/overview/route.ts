@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/auth"
 import { jsonError, serverError } from "@/lib/api"
 import { deriveStatus, listOccurrences, occurrenceState } from "@/lib/attendance"
-import { dateKey, dayName, dbDateToKey, keyToDbDate, now, timestampToKey } from "@/lib/time"
+import { dateKey, dayName, dbDateToKey, keyToDbDate, now, timeKey, timestampToKey } from "@/lib/time"
 
-const HISTORY_DAYS = 30
+const HISTORY_DAYS = 35 // five full weeks, matching the dashboard heatmap
 
 /** Everything the student dashboard needs: stats, per-subject breakdown, history, upcoming lectures, device. */
 export async function GET(req: Request) {
@@ -109,6 +109,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       today,
+      nowTime: timeKey(n),
       student: {
         name: student.name,
         rollNumber: student.rollNumber,

@@ -3,17 +3,12 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import {
-  CalendarDays,
-  ClipboardCheck,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Wifi,
-  X,
-} from "lucide-react"
+import { CalendarDays, ClipboardCheck, LayoutDashboard, LogOut, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CurrentUser } from "@/lib/user"
+import { Logo } from "@/components/brand"
+import { Avatar } from "@/components/avatar"
+import { ThemeSwitcher, ThemeToggle } from "@/components/theme"
 
 const UserContext = createContext<CurrentUser | null>(null)
 
@@ -33,17 +28,6 @@ const NAV = {
   student: [{ href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard }],
 }
 
-export function Logo({ className }: { className?: string }) {
-  return (
-    <span className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <Wifi className="size-4" />
-      </span>
-      Attendify
-    </span>
-  )
-}
-
 export default function AppShell({ user, children }: { user: CurrentUser; children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -55,21 +39,20 @@ export default function AppShell({ user, children }: { user: CurrentUser; childr
     router.refresh()
   }
 
-  const initials = user.name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase()
+  const nav = NAV[user.role]
+  const current = nav.find((n) => pathname.startsWith(n.href))
 
   const sidebar = (
-    <div className="flex h-full flex-col gap-6 p-4">
-      <Link href="/" className="px-2 pt-1">
+    <div className="flex h-full flex-col p-4">
+      <Link href="/" className="mb-8 rounded-lg px-2 pt-1.5">
         <Logo />
       </Link>
 
-      <nav className="flex flex-col gap-1">
-        {NAV[user.role].map(({ href, label, icon: Icon }) => {
+      <p className="mb-2 px-3 text-[11px] font-medium tracking-wider text-muted-foreground/70 uppercase">
+        {user.role === "teacher" ? "Teaching" : "Student"}
+      </p>
+      <nav className="flex flex-col gap-0.5">
+        {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href)
           return (
             <Link
@@ -77,56 +60,65 @@ export default function AppShell({ user, children }: { user: CurrentUser; childr
               href={href}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                active
+                  ? "bg-card text-foreground shadow-soft ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
               )}
             >
-              <Icon className="size-4" />
+              {active && <span className="absolute top-2 bottom-2 -left-4 w-1 rounded-r-full bg-brand-gradient" />}
+              <Icon className={cn("size-4 transition-colors", active ? "text-primary" : "group-hover:text-foreground")} />
               {label}
             </Link>
           )
         })}
       </nav>
 
-      <div className="mt-auto rounded-xl border bg-background p-3">
-        <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-            {initials}
+      <div className="mt-auto space-y-3">
+        <ThemeSwitcher className="w-full" />
+        <div className="rounded-xl border bg-card p-3 shadow-soft">
+          <div className="flex items-center gap-3">
+            <Avatar name={user.name} />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{user.name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user.role === "teacher" ? `Teacher · ${user.identifier}` : `${user.className} · Roll ${user.identifier}`}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{user.name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user.role === "teacher" ? `Teacher · ${user.identifier}` : `${user.className} · Roll ${user.identifier}`}
-            </p>
-          </div>
+          <button
+            onClick={logout}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-danger/30 hover:bg-danger/5 hover:text-danger"
+          >
+            <LogOut className="size-4" /> Log out
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <LogOut className="size-4" /> Log out
-        </button>
       </div>
     </div>
   )
 
   return (
     <UserContext.Provider value={user}>
-      <div className="min-h-screen bg-muted/40">
-        {/* Desktop sidebar */}
-        <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-sidebar md:block">{sidebar}</aside>
+      <div className="relative min-h-screen bg-background">
+        {/* ambient brand glow behind content */}
+        <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(60%_100%_at_70%_0%,color-mix(in_oklch,var(--primary)_9%,transparent),transparent)]" />
+
+        <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 border-r bg-sidebar/80 backdrop-blur-xl md:block">{sidebar}</aside>
 
         {/* Mobile top bar + drawer */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background px-4 py-3 md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/80 px-4 py-3 backdrop-blur-xl md:hidden">
           <Logo />
-          <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-lg p-2 hover:bg-muted">
-            <Menu className="size-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <button onClick={() => setOpen(true)} aria-label="Open menu" className="rounded-lg p-2 hover:bg-muted">
+              <Menu className="size-5" />
+            </button>
+          </div>
         </header>
         {open && (
           <div className="fixed inset-0 z-40 md:hidden">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-            <aside className="absolute inset-y-0 left-0 w-72 bg-sidebar shadow-xl">
+            <div className="absolute inset-0 animate-in bg-black/50 backdrop-blur-sm fade-in" onClick={() => setOpen(false)} />
+            <aside className="absolute inset-y-0 left-0 w-72 animate-in border-r bg-sidebar shadow-float slide-in-from-left">
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close menu"
@@ -139,8 +131,17 @@ export default function AppShell({ user, children }: { user: CurrentUser; childr
           </div>
         )}
 
-        <main className="md:pl-64">
-          <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</div>
+        <main className="relative min-w-0 overflow-x-clip md:pl-64">
+          {/* Desktop breadcrumb bar */}
+          <div className="sticky top-0 z-10 hidden h-14 items-center justify-between border-b bg-background/70 px-8 backdrop-blur-xl md:flex">
+            <p className="text-sm text-muted-foreground">
+              {user.role === "teacher" ? "Teacher" : "Student"}
+              <span className="mx-2 text-border">/</span>
+              <span className="font-medium text-foreground">{current?.label ?? "Dashboard"}</span>
+            </p>
+            <ThemeToggle />
+          </div>
+          <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-10">{children}</div>
         </main>
       </div>
     </UserContext.Provider>
